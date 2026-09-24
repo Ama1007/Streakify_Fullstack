@@ -1,235 +1,273 @@
-# 🔥 Streakify — Habit Streak Tracker Backend
+# 🔥 Streakify 2.0 — Full-Stack Habit & Streak Tracker
 
-A **Spring Boot** REST API backend for tracking user habits, logging daily completions, and calculating streaks. Built as part of the **Litmus7 Microservices Internship Assignment**.
+[![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://www.oracle.com/java/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-blue.svg)](https://supabase.com/)
+[![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED.svg)](https://www.docker.com/)
+[![Render](https://img.shields.io/badge/Deployed-Render-46E3B7.svg)](https://streakify-fullstack-1.onrender.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**Streakify 2.0** is an enterprise-ready, cloud-deployed full-stack habit and streak tracking platform. Built with **Spring Boot 3**, **PostgreSQL (Supabase)**, and a modern, modular **HTML5/CSS3/Vanilla JS** interface, Streakify empowers users to build unbreakable habits with daily check-ins, automated streak analytics, global leaderboards, and a dedicated **Admin Command Center**.
+
+🌐 **Live Demo:** [https://streakify-fullstack-1.onrender.com](https://streakify-fullstack-1.onrender.com)  
+📦 **GitHub Repository:** [https://github.com/Ama1007/Streakify_Fullstack](https://github.com/Ama1007/Streakify_Fullstack)
 
 ---
 
 ## 📚 Table of Contents
 
+- [Key Features](#-key-features)
+- [System Architecture](#-system-architecture)
 - [Tech Stack](#-tech-stack)
-- [Architecture](#-architecture)
-- [Features](#-features)
-- [Frontend (HTML/CSS/JS)](#-frontend-html-css-js)
-- [Setup Instructions](#-setup-instructions)
-- [API Reference](#-api-reference)
-- [Business Logic](#-business-logic)
-- [Future Improvements](#-future-improvements)
+- [REST API Reference](#-rest-api-reference)
+- [Engineering Challenges & Highlights](#-engineering-challenges--highlights)
+- [Frontend Architecture](#-frontend-architecture)
+- [Local Setup & Installation](#-local-setup--installation)
+- [Docker & Cloud Deployment](#-docker--cloud-deployment)
 - [Author](#-author)
+
+---
+
+## ✨ Key Features
+
+### 🔐 1. Authentication & Security
+- **BCrypt Password Hashing**: Passwords are cryptographically salted and hashed using Spring Security's `BCryptPasswordEncoder` before storage.
+- **Role-Based Access Control**:
+  - `ROLE_USER`: Personal habit dashboard, daily check-ins, streak tracking, history view.
+  - `ROLE_ADMIN`: Platform telemetry, full user management, account activation/deactivation, habit oversight.
+- **Entity Security**: Passwords are annotated with `@JsonProperty(access = WRITE_ONLY)` to guarantee they are never serialized in API responses.
+
+### 📊 2. User Habits & Streak Tracking
+- **Interactive Habit Dashboard**: Visual summary of Active Habits, Best Personal Streak, and Today's completion rate with an animated gradient progress bar.
+- **7-Day Mini Calendar Matrix**: Quick glance at the last 7 days; click any chip to toggle completion status.
+- **Idempotent UPSERT Check-Ins**: Seamless single-click check-ins with automatic insert or update handling.
+- **Historical Logs & Retroactive Tracking**: Modal interface allowing users to view and log past dates.
+- **Timezone-Resilient Engine**: Prevents premature midnight streak resets and reconciles client timezones (e.g. IST +5:30) with UTC cloud servers.
+
+### 🛡️ 3. Admin Command Center
+- **Live Platform Telemetry**: Instant metrics for Registered Users, Total Habits, Active Streaks, and All-Time Record Streak.
+- **User Directory**: Searchable directory displaying user status, total habits, current streak, and best streak.
+- **User Account Controls**: Activate, deactivate, or delete user accounts with full cascade deletion.
+- **Habit Oversight**: View detailed habit lists and streak metrics for any registered user.
+
+### 🏆 4. Global Leaderboard
+- Real-time ranking of top habit streaks across the entire platform.
+- Automatically filtered for active accounts and sorted by current streak and longest streak.
+
+---
+
+## 🏗 System Architecture
+
+Streakify follows the industry-standard **3-Tier Layered Architecture**:
+
+```
+┌────────────────────────────────────────────────────────┐
+│             Presentation Layer (Client)                │
+│       Modular Vanilla HTML5, CSS3, ES6 JavaScript      │
+└───────────────────────────┬────────────────────────────┘
+                            │ RESTful JSON over HTTPS
+┌───────────────────────────▼────────────────────────────┐
+│             Controller Layer (@RestController)         │
+│  AuthController | HabitController | AdminController    │
+└───────────────────────────┬────────────────────────────┘
+                            │ Constructor Injection
+┌───────────────────────────▼────────────────────────────┐
+│             Service Layer (@Service, @Transactional)   │
+│  HabitServiceImpl | HabitLogServiceImpl | UserServiceImpl│
+└───────────────────────────┬────────────────────────────┘
+                            │ Spring Data JPA / Hibernate
+┌───────────────────────────▼────────────────────────────┐
+│            Data Access Layer (@Repository)             │
+│  UserRepository | HabitRepository | HabitLogRepository │
+└───────────────────────────┬────────────────────────────┘
+                            │ HikariCP Connection Pool
+┌───────────────────────────▼────────────────────────────┐
+│             Cloud PostgreSQL Database (Supabase)       │
+└────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## 🛠 Tech Stack
 
-| Technology | Version |
+| Domain | Technologies |
 |---|---|
-| Java | 17 |
-| Spring Boot | 3.x |
-| Spring Data JPA + Hibernate | — |
-| PostgreSQL | — |
-| Maven | — |
-| Lombok | — |
+| **Backend** | Java 17, Spring Boot 3.x, Spring Data JPA, Spring Security (Crypto / BCrypt) |
+| **Database** | PostgreSQL, Supabase (with PgBouncer connection pooler) |
+| **Connection Pool**| HikariCP with custom prepared statement tuning (`prepareThreshold=0`) |
+| **Frontend** | Vanilla HTML5, CSS3 (Modern Glassmorphism & Dark Mode), ES6+ JavaScript |
+| **Containerization**| Docker (Multi-stage Eclipse Temurin JRE build) |
+| **Cloud Hosting** | Render (Web Services) |
+| **Build & Tooling**| Apache Maven 3.x, Lombok |
 
 ---
 
-## 🏗 Architecture
+## 📡 REST API Reference
 
-The project follows a clean **layered architecture**:
+### 🔐 Authentication (`/auth`)
+
+| Method | Endpoint | Description | Access |
+|---|---|---|---|
+| `POST` | `/auth/register` | Register a new user account | Public |
+| `POST` | `/auth/login` | Authenticate with BCrypt password verification | Public |
+
+### 🛡️ Admin Command Center (`/admin`)
+
+| Method | Endpoint | Description | Access |
+|---|---|---|---|
+| `GET` | `/admin/stats` | Platform summary (users, habits, active/record streaks) | Admin |
+| `GET` | `/admin/users` | All users with habit counts and streak metrics | Admin |
+| `PUT` | `/admin/users/{id}/toggle-status` | Activate or deactivate a user account | Admin |
+| `DELETE` | `/admin/users/{id}` | Permanently delete a user and cascade habits | Admin |
+
+### 🏆 Leaderboard
+
+| Method | Endpoint | Description | Access |
+|---|---|---|---|
+| `GET` | `/habits/leaderboard` | Top 20 habit streaks platform-wide | Public / User |
+
+### 📘 Habits & Tracking (`/habits`)
+
+| Method | Endpoint | Description | Access |
+|---|---|---|---|
+| `POST` | `/habits?userId={id}` | Create a habit with weekly target days | User |
+| `GET` | `/users/{userId}/habits` | Retrieve all habits belonging to a user | User |
+| `DELETE` | `/habits/{habitId}` | Delete a habit and all associated logs | User |
+| `POST` | `/habits/{habitId}/logs?date=YYYY-MM-DD&completed={bool}` | Idempotent UPSERT habit check-in | User |
+| `PUT` | `/habits/{habitId}/logs/{date}?completed={bool}` | Update completion status for a date | User |
+| `GET` | `/habits/{habitId}/logs` | Fetch all historical logs for a habit | User |
+| `GET` | `/habits/{habitId}/streak` | Calculate current and all-time best streak | User |
+
+---
+
+## 💡 Engineering Challenges & Highlights
+
+### 1. Idempotent UPSERT Check-Ins
+* **Challenge**: Separate `POST` (create) and `PUT` (update) endpoints caused race conditions when users clicked rapidly or when the client-side state lagged behind the database, resulting in `DuplicateLogException` or `404/500` errors.
+* **Solution**: Converted logging into an idempotent UPSERT pattern in `HabitLogServiceImpl`. If a record exists for that date, it updates it; if absent, it creates it. Network debouncing was also added to the frontend to eliminate redundant submissions.
+
+### 2. Cross-Midnight Timezone Reconciliation
+* **Challenge**: The cloud server runs in **UTC**, while users may check in from forward timezones (e.g. India at **IST / UTC+5:30**). At 12:15 AM IST on Sep 25, the cloud server clock was still at 6:45 PM on Sep 24. Standard `date.isAfter(LocalDate.now())` validation falsely rejected check-ins as "future dates," while streak calculations prematurely reset to 0.
+* **Solution**: 
+  - Adjusted future validation threshold to `LocalDate.now().plusDays(1)` to support all international timezones.
+  - Rewrote the streak engine to evaluate consecutive completions based on the latest completed date, ensuring a streak stays active all through the new day until midnight.
+
+### 3. PostgreSQL Transaction Aborts & `@Transactional`
+* **Challenge**: An unhandled constraint check previously left PostgreSQL pooled connections in an "aborted transaction" state, breaking subsequent queries on the same connection with `ERROR: current transaction is aborted, commands ignored until end of transaction block`.
+* **Solution**: Annotated service methods with Spring's `@Transactional`. If an exception occurs, Spring immediately issues a clean `ROLLBACK` to PostgreSQL, returning a healthy, un-aborted connection to the HikariCP pool.
+
+### 4. Supabase PgBouncer Prepared Statement Cache Conflict
+* **Challenge**: Supabase's transaction pooler on port `6543` rotates server connections after each transaction. Java's PostgreSQL driver default prepared statement caching produced `ERROR: prepared statement "S_2" does not exist`.
+* **Solution**: Tuned HikariCP data source properties (`prepareThreshold=0`, `preparedStatementCacheQueries=0`) to disable named server-side statement caching, ensuring 100% compatibility with PgBouncer.
+
+---
+
+## 🎨 Frontend Architecture
+
+The user interface is built using modular, lightweight Vanilla web technologies—requiring no heavy build steps, Webpack, or large node_modules:
 
 ```
-controller → service → repository → database
-```
-
-**Package Structure:**
-
-```
-com.streakify.streakify
-├── controller
-├── service
-├── repository
-├── entity
-└── exception
+frontend/ (and src/main/resources/static/)
+├── css/
+│   ├── main.css         # Design tokens, variables, typography, reset
+│   ├── auth.css         # Login, registration, and role portal styling
+│   ├── habits.css       # Cards, 7-day tracker matrix, metrics, history modal
+│   ├── admin.css        # Admin command center, telemetry cards, user table
+│   └── leaderboard.css  # Ranking table and trophy badges
+├── js/
+│   ├── api.js           # API base configuration, state, shared toast helpers
+│   ├── auth.js          # Authentication controller and session management
+│   ├── habits.js        # Habits CRUD, check-ins, history logging, debouncing
+│   ├── admin.js         # Admin dashboard data sync and user controls
+│   ├── leaderboard.js   # Leaderboard ranking loader
+│   └── main.js          # SPA tab routing and initialization
+└── index.html           # Semantic, clean HTML5 single-page container
 ```
 
 ---
 
-## ✨ Features
+## ⚙️ Local Setup & Installation
 
-### 👤 User Management
-- Create a user
-- Get user by ID
-- Get all users
-- Delete a user
-
-### 📘 Habit Management
-- Create a habit for a user
-- Get habits by user
-- Delete a habit
-
-### 📅 Habit Logging
-- Log habit completion by date
-- Prevent duplicate logs on the same day
-- Prevent logging future dates
-- Update log status
-- Fetch all logs for a habit
-
-### 🔥 Streak Calculation
-- Current streak calculation
-- Longest streak calculation
-
-### ⚠️ Exception Handling
-- Custom exceptions
-- Global exception handler
-- Proper HTTP status codes (`400`, `404`)
-
----
-
-## 🎨 Frontend (HTML / CSS / JS)
-
-A clean, modern, and responsive user interface built using **Vanilla HTML5, CSS3, and JavaScript** (no heavy frameworks or node_modules needed):
-
-- **User Profile Switcher**: Switch between profiles or create new users on the fly.
-- **Habit Dashboard**: Overview metrics showing Active Habits, Personal Best Streak, and Today's completion rate with an animated progress bar.
-- **Interactive Habit Cards**:
-  - One-click **"Check In Today"** toggle.
-  - **7-Day Mini Calendar Matrix**: Visual representation of the last 7 days; click any day to toggle completion status.
-  - 🔥 **Current Streak** & 🏆 **Longest Streak** counters.
-- **Log History & Past Dates Modal**: View all past logs and retroactively log or update dates (preventing future dates per backend rules).
-- **Toast Notifications**: Real-time feedback for logs, habit additions, and deletions.
-- **Dual Launch Option**: Served directly via Spring Boot at `http://localhost:8080/` (`src/main/resources/static/`) or opened via VS Code Live Server from `frontend/index.html`.
-
----
-
-## ⚙️ Setup Instructions
+### Prerequisites
+- **Java 17+** (JDK)
+- **PostgreSQL 14+**
+- **Git** & **Maven**
 
 ### 1. Clone the Repository
-
 ```bash
-git clone https://github.com/Ama1007/streakify-backend.git
-cd streakify-backend
+git clone https://github.com/Ama1007/Streakify_Fullstack.git
+cd Streakify_Fullstack
 ```
 
-### 2. Configure PostgreSQL
-
-Create the database:
-
+### 2. Configure Database
+Create a PostgreSQL database:
 ```sql
 CREATE DATABASE streakify_db;
 ```
 
-Update `src/main/resources/application.properties`:
-
+Update `src/main/resources/application.properties` (or set environment variables):
 ```properties
 spring.datasource.url=jdbc:postgresql://localhost:5432/streakify_db
-spring.datasource.username=your_username
+spring.datasource.username=postgres
 spring.datasource.password=your_password
 spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
 ```
 
 ### 3. Run the Application
-
-**Via IntelliJ:** Open the project and run `StreakifyApplication`
-
-**Via terminal:**
-
 ```bash
-mvn spring-boot:run
+# Using Maven wrapper (Windows PowerShell)
+.\mvnw.cmd spring-boot:run
+
+# Using Maven wrapper (macOS / Linux)
+./mvnw spring-boot:run
 ```
 
-Server starts at: **http://localhost:8080**
+Access the application in your browser at:  
+👉 **`http://localhost:8080/`**
 
 ---
 
-## 📡 API Reference
+## 🐳 Docker & Cloud Deployment
 
-### 👤 Users
+Streakify includes a production-ready **Dockerfile** with a multi-stage build:
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/users` | Create a new user |
-| `GET` | `/users` | Get all users |
-| `GET` | `/users/{userId}` | Get user by ID |
-| `DELETE` | `/users/{userId}` | Delete a user |
+```dockerfile
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-**Create User — Request Body:**
-```json
-{
-  "name": "Amal",
-  "email": "amal@example.com"
-}
+FROM eclipse-temurin:17-jre-jammy
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
----
+### Render Deployment Configuration
 
-### 📘 Habits
+When deploying on **Render** as a Web Service:
+1. **Environment**: `Docker`
+2. **Build Command**: Automatically handled by Dockerfile.
+3. **Environment Variables**:
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/habits?userId={id}` | Create a habit for a user |
-| `GET` | `/users/{userId}/habits` | Get all habits for a user |
-| `DELETE` | `/habits/{habitId}` | Delete a habit |
-
-**Create Habit — Request Body:**
-```json
-{
-  "name": "Morning Workout",
-  "targetDaysPerWeek": 5
-}
-```
-
----
-
-### 📅 Habit Logs
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/habits/{habitId}/logs?date=YYYY-MM-DD&completed=true` | Log habit completion |
-| `PUT` | `/habits/{habitId}/logs/{date}?completed=false` | Update log status |
-| `GET` | `/habits/{habitId}/logs` | Get all logs for a habit |
-
----
-
-### 🔥 Streaks
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/habits/{habitId}/streak` | Get current and longest streak |
-
-**Response:**
-```json
-{
-  "habitId": 2,
-  "currentStreak": 3,
-  "longestStreak": 7
-}
-```
-
----
-
-## 📐 Business Logic
-
-| Rule | Description |
+| Variable | Recommended Value |
 |---|---|
-| ❌ No future logging | Cannot log a habit completion for a future date |
-| ❌ No duplicate logs | Cannot log the same habit twice on the same day |
-| ✅ Streak calculation | Counts consecutive days of habit completion |
-| ✅ Longest streak | Tracks the all-time longest completion streak |
-
----
-
-## 🚀 Future Improvements
-
-- [ ] DTO layer for cleaner API responses
-- [ ] Swagger / OpenAPI documentation
-- [ ] JWT Authentication
-- [ ] Pagination support
-- [ ] Docker containerization
-- [ ] Full microservice separation
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://<HOST>:6543/postgres?sslmode=require&prepareThreshold=0` |
+| `SPRING_DATASOURCE_USERNAME` | `postgres.<project-ref>` |
+| `SPRING_DATASOURCE_PASSWORD` | `<your-supabase-db-password>` |
+| `PORT` | `8080` |
 
 ---
 
 ## 👩‍💻 Author
 
 **Amal Anish**  
-Backend Developer · Spring Boot Enthusiast  
-[GitHub](https://github.com/Ama1007)
+*Full-Stack & Backend Developer*  
+- **GitHub:** [@Ama1007](https://github.com/Ama1007)  
+- **Live Project:** [Streakify 2.0 on Render](https://streakify-fullstack-1.onrender.com)
+
+---
+
+*Built with passion, clean code principles, and modern Spring Boot architecture.*
