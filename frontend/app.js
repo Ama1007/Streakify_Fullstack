@@ -9,36 +9,70 @@ const API_BASE = (window.location.hostname === 'localhost' && window.location.po
   : window.location.origin;
 
 // State
-let users = [];
-let currentUserId = localStorage.getItem('streakify_active_user_id') || null;
+let currentUser = null; // { id, name, email, role }
 let activeHabits = [];
 let activeHabitLogsMap = {}; // habitId -> Array of logs
 let activeHabitStreakMap = {}; // habitId -> { currentStreak, longestStreak }
 let activeHistoryHabitId = null;
+let currentView = 'habits'; // 'habits', 'admin', 'leaderboard'
+let authMode = 'user_login'; // 'user_login', 'admin_login', 'register'
 
-// DOM Elements
-const userSelect = document.getElementById('userSelect');
-const btnNewUser = document.getElementById('btnNewUser');
-const btnDeleteUser = document.getElementById('btnDeleteUser');
-const noUserSection = document.getElementById('noUserSection');
+// DOM Elements: Navigation & Header
+const headerControls = document.getElementById('headerControls');
+const navLoggedIn = document.getElementById('navLoggedIn');
+const navLoggedOut = document.getElementById('navLoggedOut');
+const navBtnHabits = document.getElementById('navBtnHabits');
+const navBtnAdmin = document.getElementById('navBtnAdmin');
+const navBtnLeaderboard = document.getElementById('navBtnLeaderboard');
+const userNameDisplay = document.getElementById('userNameDisplay');
+const btnSignOut = document.getElementById('btnSignOut');
+const btnOpenAuth = document.getElementById('btnOpenAuth');
+
+// DOM Elements: Main Sections
+const authSection = document.getElementById('authSection');
 const dashboardSection = document.getElementById('dashboardSection');
-const btnWelcomeCreate = document.getElementById('btnWelcomeCreate');
+const adminSection = document.getElementById('adminSection');
+const leaderboardSection = document.getElementById('leaderboardSection');
 
-// Stats Elements
+// DOM Elements: Auth Form & Tabs
+const tabUserLogin = document.getElementById('tabUserLogin');
+const tabAdminLogin = document.getElementById('tabAdminLogin');
+const tabRegister = document.getElementById('tabRegister');
+const authTitle = document.getElementById('authTitle');
+const authSubtitle = document.getElementById('authSubtitle');
+const authForm = document.getElementById('authForm');
+const groupAuthName = document.getElementById('groupAuthName');
+const authName = document.getElementById('authName');
+const authEmail = document.getElementById('authEmail');
+const authPassword = document.getElementById('authPassword');
+const adminHintBox = document.getElementById('adminHintBox');
+const btnAuthSubmit = document.getElementById('btnAuthSubmit');
+
+// DOM Elements: User Dashboard Stats
 const statTotalHabits = document.getElementById('statTotalHabits');
 const statBestStreak = document.getElementById('statBestStreak');
 const statTodayCompleted = document.getElementById('statTodayCompleted');
 const todayProgressBar = document.getElementById('todayProgressBar');
 
-// Habits Elements
+// DOM Elements: Habits Grid
 const habitsGrid = document.getElementById('habitsGrid');
 const emptyHabitsState = document.getElementById('emptyHabitsState');
 const btnOpenAddHabit = document.getElementById('btnOpenAddHabit');
 const btnEmptyAddHabit = document.getElementById('btnEmptyAddHabit');
 
+// DOM Elements: Admin Section
+const adminTotalUsers = document.getElementById('adminTotalUsers');
+const adminTotalHabits = document.getElementById('adminTotalHabits');
+const adminActiveStreaks = document.getElementById('adminActiveStreaks');
+const adminRecordStreak = document.getElementById('adminRecordStreak');
+const adminUserTableBody = document.getElementById('adminUserTableBody');
+const btnRefreshAdmin = document.getElementById('btnRefreshAdmin');
+
+// DOM Elements: Leaderboard Section
+const leaderboardTableBody = document.getElementById('leaderboardTableBody');
+const btnRefreshLeaderboard = document.getElementById('btnRefreshLeaderboard');
+
 // Modals
-const userModal = document.getElementById('userModal');
-const newUserForm = document.getElementById('newUserForm');
 const habitModal = document.getElementById('habitModal');
 const newHabitForm = document.getElementById('newHabitForm');
 const habitTargetDays = document.getElementById('habitTargetDays');
@@ -50,6 +84,9 @@ const customDateLogForm = document.getElementById('customDateLogForm');
 const customLogDate = document.getElementById('customLogDate');
 const customLogStatus = document.getElementById('customLogStatus');
 const logsList = document.getElementById('logsList');
+const adminHabitsModal = document.getElementById('adminHabitsModal');
+const adminHabitsModalTitle = document.getElementById('adminHabitsModalTitle');
+const adminHabitsList = document.getElementById('adminHabitsList');
 const toastContainer = document.getElementById('toastContainer');
 
 // ==========================================
@@ -89,7 +126,6 @@ function showToast(message, type = 'info') {
   }, 3500);
 }
 
-// Modal open/close handling
 function openModal(modal) {
   modal.style.display = 'flex';
 }
@@ -128,70 +164,385 @@ document.querySelectorAll('.preset-chip').forEach(chip => {
   });
 });
 
-// Set max date on custom date picker to today
 if (customLogDate) {
   customLogDate.max = getTodayString();
   customLogDate.value = getTodayString();
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>"']/g, function(m) {
+    return {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    }[m];
+  });
+}
+
 // ==========================================
-// API Interaction Functions
+// Authentication Functions
 // ==========================================
 
-async function fetchUsers() {
-  try {
-    const res = await fetch(`${API_BASE}/users`);
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    users = await res.json();
-    renderUserSelect();
-  } catch (err) {
-    console.error('Failed to load users:', err);
-    showToast('Could not connect to backend server. Make sure Spring Boot is running on port 8080.', 'error');
+function setAuthMode(mode) {
+  authMode = mode;
+  tabUserLogin.classList.remove('active');
+  tabAdminLogin.classList.remove('active');
+  tabRegister.classList.remove('active');
+
+  if (mode === 'user_login') {
+    tabUserLogin.classList.add('active');
+    authTitle.textContent = 'Welcome Back';
+    authSubtitle.textContent = 'Sign in to track your habits and maintain your streak.';
+    groupAuthName.style.display = 'none';
+    authName.required = false;
+    adminHintBox.style.display = 'none';
+    btnAuthSubmit.textContent = 'Sign In';
+  } else if (mode === 'admin_login') {
+    tabAdminLogin.classList.add('active');
+    authTitle.textContent = '🛡️ Admin Portal';
+    authSubtitle.textContent = 'Sign in to oversee platform health and streaks.';
+    groupAuthName.style.display = 'none';
+    authName.required = false;
+    adminHintBox.style.display = 'block';
+    btnAuthSubmit.textContent = 'Sign In as Admin';
+  } else if (mode === 'register') {
+    tabRegister.classList.add('active');
+    authTitle.textContent = 'Create Account';
+    authSubtitle.textContent = 'Join Streakify and start building positive momentum.';
+    groupAuthName.style.display = 'block';
+    authName.required = true;
+    adminHintBox.style.display = 'none';
+    btnAuthSubmit.textContent = 'Create Account';
   }
 }
 
-async function createUser(name, email) {
-  try {
-    const res = await fetch(`${API_BASE}/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email })
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(err || 'Failed to create user');
+tabUserLogin.addEventListener('click', () => setAuthMode('user_login'));
+tabAdminLogin.addEventListener('click', () => setAuthMode('admin_login'));
+tabRegister.addEventListener('click', () => setAuthMode('register'));
+
+authForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = authEmail.value.trim();
+  const password = authPassword.value;
+
+  if (authMode === 'register') {
+    const name = authName.value.trim();
+    if (!name || !email || !password) {
+      showToast('Please fill in all fields', 'error');
+      return;
     }
-    const newUser = await res.json();
-    showToast(`User ${newUser.name} created!`, 'success');
-    closeModal(userModal);
-    newUserForm.reset();
-    await fetchUsers();
-    switchUser(newUser.id);
-  } catch (err) {
-    console.error(err);
-    showToast(err.message || 'Error creating user', 'error');
+    try {
+      const res = await fetch(`${API_BASE}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Registration failed');
+
+      showToast('Account created successfully! Signing you in...', 'success');
+      loginSuccess({ id: data.id, name: data.name, email: data.email, role: data.role });
+    } catch (err) {
+      console.error(err);
+      showToast(err.message, 'error');
+    }
+  } else {
+    // Login (User or Admin)
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Login failed');
+
+      if (authMode === 'admin_login' && data.role !== 'ROLE_ADMIN') {
+        showToast('Notice: This account is a regular User profile. Redirecting to your Habit Dashboard...', 'info');
+      } else {
+        showToast(`Welcome back, ${data.name}!`, 'success');
+      }
+
+      loginSuccess({ id: data.id, name: data.name, email: data.email, role: data.role });
+    } catch (err) {
+      console.error(err);
+      showToast(err.message, 'error');
+    }
+  }
+});
+
+function loginSuccess(user) {
+  currentUser = user;
+  localStorage.setItem('streakify_auth_user', JSON.stringify(user));
+  authForm.reset();
+  updateUIForUser();
+}
+
+function signOut() {
+  currentUser = null;
+  localStorage.removeItem('streakify_auth_user');
+  activeHabits = [];
+  activeHabitLogsMap = {};
+  activeHabitStreakMap = {};
+  showToast('Signed out successfully', 'info');
+  updateUIForUser();
+}
+
+btnSignOut.addEventListener('click', signOut);
+btnOpenAuth.addEventListener('click', () => {
+  switchView('auth');
+});
+
+// ==========================================
+// View Routing & Navigation
+// ==========================================
+
+function switchView(view) {
+  currentView = view;
+  authSection.style.display = 'none';
+  dashboardSection.style.display = 'none';
+  adminSection.style.display = 'none';
+  leaderboardSection.style.display = 'none';
+
+  navBtnHabits.classList.remove('active');
+  navBtnAdmin.classList.remove('active');
+  navBtnLeaderboard.classList.remove('active');
+
+  if (view === 'auth') {
+    authSection.style.display = 'flex';
+  } else if (view === 'habits') {
+    dashboardSection.style.display = 'block';
+    navBtnHabits.classList.add('active');
+    if (currentUser) loadHabitsForUser(currentUser.id);
+  } else if (view === 'admin') {
+    adminSection.style.display = 'block';
+    navBtnAdmin.classList.add('active');
+    loadAdminData();
+  } else if (view === 'leaderboard') {
+    leaderboardSection.style.display = 'block';
+    navBtnLeaderboard.classList.add('active');
+    loadLeaderboard();
   }
 }
 
-async function deleteCurrentUser() {
-  if (!currentUserId) return;
-  const user = users.find(u => u.id == currentUserId);
-  const confirmDelete = confirm(`Are you sure you want to delete profile "${user ? user.name : 'this user'}" and all their habits?`);
-  if (!confirmDelete) return;
+navBtnHabits.addEventListener('click', () => switchView('habits'));
+navBtnAdmin.addEventListener('click', () => switchView('admin'));
+navBtnLeaderboard.addEventListener('click', () => switchView('leaderboard'));
 
+function updateUIForUser() {
+  if (!currentUser) {
+    navLoggedIn.style.display = 'none';
+    navLoggedOut.style.display = 'block';
+    switchView('auth');
+  } else {
+    navLoggedOut.style.display = 'none';
+    navLoggedIn.style.display = 'flex';
+
+    if (currentUser.role === 'ROLE_ADMIN') {
+      userNameDisplay.textContent = `${currentUser.name} (Admin)`;
+      navBtnAdmin.style.display = 'inline-flex';
+      switchView('admin');
+    } else {
+      userNameDisplay.textContent = currentUser.name;
+      navBtnAdmin.style.display = 'none';
+      switchView('habits');
+    }
+  }
+}
+
+// ==========================================
+// Admin Operations
+// ==========================================
+
+async function loadAdminData() {
   try {
-    const res = await fetch(`${API_BASE}/users/${currentUserId}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Failed to delete user');
-    showToast('User deleted', 'info');
-    currentUserId = null;
-    localStorage.removeItem('streakify_active_user_id');
-    await fetchUsers();
-    renderAppView();
+    const [statsRes, usersRes] = await Promise.all([
+      fetch(`${API_BASE}/admin/stats`),
+      fetch(`${API_BASE}/admin/users`)
+    ]);
+
+    if (statsRes.ok) {
+      const stats = await statsRes.json();
+      adminTotalUsers.textContent = stats.totalUsers || 0;
+      adminTotalHabits.textContent = stats.totalHabits || 0;
+      adminActiveStreaks.textContent = stats.activeStreaks || 0;
+      adminRecordStreak.innerHTML = `${stats.highestStreak || 0} <span class="unit">days</span>`;
+    }
+
+    if (usersRes.ok) {
+      const usersList = await usersRes.json();
+      renderAdminUsersTable(usersList);
+    }
   } catch (err) {
-    console.error(err);
-    showToast(err.message || 'Error deleting user', 'error');
+    console.error('Failed to load admin data:', err);
+    showToast('Failed to load admin dashboard data', 'error');
   }
 }
+
+btnRefreshAdmin.addEventListener('click', () => {
+  loadAdminData();
+  showToast('Admin data refreshed', 'info');
+});
+
+function renderAdminUsersTable(usersList) {
+  adminUserTableBody.innerHTML = '';
+
+  if (usersList.length === 0) {
+    adminUserTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">No users found.</td></tr>';
+    return;
+  }
+
+  usersList.forEach(u => {
+    const tr = document.createElement('tr');
+    const isCurrentUser = currentUser && currentUser.id === u.id;
+    const roleBadgeClass = u.role === 'ROLE_ADMIN' ? 'badge-role-admin' : 'badge-role-user';
+    const roleLabel = u.role === 'ROLE_ADMIN' ? 'Admin' : 'User';
+    const statusBadgeClass = u.active ? 'badge-active' : 'badge-inactive';
+    const statusLabel = u.active ? 'Active' : 'Deactivated';
+
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(u.name)}</strong> ${isCurrentUser ? '<span style="font-size: 11px; color: var(--primary);">(You)</span>' : ''}</td>
+      <td>${escapeHtml(u.email)}</td>
+      <td><span class="badge ${roleBadgeClass}">${roleLabel}</span></td>
+      <td><span class="badge ${statusBadgeClass}">${statusLabel}</span></td>
+      <td>${u.habitCount}</td>
+      <td><span class="streak-pill">🔥 ${u.currentStreak}</span></td>
+      <td>🏆 ${u.longestStreak} d</td>
+      <td style="text-align: right;">
+        <button class="btn btn-secondary btn-sm" data-admin-action="habits" data-user-id="${u.id}" style="padding: 4px 8px; font-size: 12px; margin-right: 4px;">
+          View Habits
+        </button>
+        ${!isCurrentUser ? `
+          <button class="btn btn-secondary btn-sm" data-admin-action="toggle-status" data-user-id="${u.id}" style="padding: 4px 8px; font-size: 12px; margin-right: 4px;">
+            ${u.active ? 'Deactivate' : 'Activate'}
+          </button>
+          <button class="btn btn-danger-outline btn-sm" data-admin-action="delete-user" data-user-id="${u.id}" style="padding: 4px 8px; font-size: 12px;">
+            🗑️
+          </button>
+        ` : ''}
+      </td>
+    `;
+
+    adminUserTableBody.appendChild(tr);
+  });
+
+  // Attach action listeners
+  document.querySelectorAll('[data-admin-action="toggle-status"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const uId = btn.getAttribute('data-user-id');
+      try {
+        const res = await fetch(`${API_BASE}/admin/users/${uId}/toggle-status`, { method: 'PUT' });
+        if (!res.ok) throw new Error('Failed to update user status');
+        showToast('User status updated', 'success');
+        loadAdminData();
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-admin-action="delete-user"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const uId = btn.getAttribute('data-user-id');
+      if (!confirm('Are you sure you want to permanently delete this user and all their habits?')) return;
+      try {
+        const res = await fetch(`${API_BASE}/admin/users/${uId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed to delete user');
+        showToast('User deleted', 'info');
+        loadAdminData();
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-admin-action="habits"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const uId = parseInt(btn.getAttribute('data-user-id'), 10);
+      const targetUser = usersList.find(u => u.id === uId);
+      if (!targetUser) return;
+
+      adminHabitsModalTitle.textContent = `${targetUser.name}'s Habits`;
+      adminHabitsList.innerHTML = '';
+
+      if (!targetUser.habits || targetUser.habits.length === 0) {
+        adminHabitsList.innerHTML = '<p style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 12px 0;">No habits found for this user.</p>';
+      } else {
+        targetUser.habits.forEach(h => {
+          const item = document.createElement('div');
+          item.className = 'log-item';
+          item.innerHTML = `
+            <div>
+              <strong>${escapeHtml(h.name)}</strong>
+              <div style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Target: ${h.targetDaysPerWeek} days/week</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <span class="streak-pill">🔥 ${h.currentStreak} d</span>
+              <span class="badge" style="background: rgba(255,255,255,0.06);">🏆 Best: ${h.longestStreak} d</span>
+            </div>
+          `;
+          adminHabitsList.appendChild(item);
+        });
+      }
+
+      openModal(adminHabitsModal);
+    });
+  });
+}
+
+// ==========================================
+// Leaderboard Operations
+// ==========================================
+
+async function loadLeaderboard() {
+  try {
+    const res = await fetch(`${API_BASE}/habits/leaderboard`);
+    if (!res.ok) throw new Error('Failed to load leaderboard');
+    const list = await res.json();
+    renderLeaderboard(list);
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to load leaderboard', 'error');
+  }
+}
+
+btnRefreshLeaderboard.addEventListener('click', () => {
+  loadLeaderboard();
+  showToast('Leaderboard refreshed', 'info');
+});
+
+function renderLeaderboard(list) {
+  leaderboardTableBody.innerHTML = '';
+
+  if (list.length === 0) {
+    leaderboardTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;">No streak records yet. Check in today to claim the top spot!</td></tr>';
+    return;
+  }
+
+  list.forEach((item, index) => {
+    const tr = document.createElement('tr');
+    let rankBadge = `<span class="rank-badge">${index + 1}</span>`;
+    if (index === 0) rankBadge = `<span class="rank-badge rank-1">🥇</span>`;
+    if (index === 1) rankBadge = `<span class="rank-badge rank-2">🥈</span>`;
+    if (index === 2) rankBadge = `<span class="rank-badge rank-3">🥉</span>`;
+
+    tr.innerHTML = `
+      <td>${rankBadge}</td>
+      <td><strong>${escapeHtml(item.userName)}</strong></td>
+      <td>${escapeHtml(item.habitName)}</td>
+      <td><span class="streak-pill">🔥 ${item.currentStreak} days</span></td>
+      <td>🏆 ${item.longestStreak} days</td>
+    `;
+    leaderboardTableBody.appendChild(tr);
+  });
+}
+
+// ==========================================
+// User Habit Operations
+// ==========================================
 
 async function loadHabitsForUser(userId) {
   if (!userId) return;
@@ -200,19 +551,15 @@ async function loadHabitsForUser(userId) {
     if (!res.ok) throw new Error('Failed to fetch habits');
     activeHabits = await res.json();
 
-    // Fetch streaks & logs in parallel for all habits
+    // Fetch streaks & logs in parallel
     await Promise.all(activeHabits.map(async (h) => {
       try {
         const [streakRes, logsRes] = await Promise.all([
           fetch(`${API_BASE}/habits/${h.id}/streak`),
           fetch(`${API_BASE}/habits/${h.id}/logs`)
         ]);
-        if (streakRes.ok) {
-          activeHabitStreakMap[h.id] = await streakRes.json();
-        }
-        if (logsRes.ok) {
-          activeHabitLogsMap[h.id] = await logsRes.json();
-        }
+        if (streakRes.ok) activeHabitStreakMap[h.id] = await streakRes.json();
+        if (logsRes.ok) activeHabitLogsMap[h.id] = await logsRes.json();
       } catch (e) {
         console.error(`Error loading details for habit ${h.id}:`, e);
       }
@@ -222,17 +569,14 @@ async function loadHabitsForUser(userId) {
     renderStats();
   } catch (err) {
     console.error(err);
-    showToast('Failed to load habits for user', 'error');
+    showToast('Failed to load habits', 'error');
   }
 }
 
 async function createHabit(name, targetDaysPerWeek) {
-  if (!currentUserId) {
-    showToast('Please select a user first', 'error');
-    return;
-  }
+  if (!currentUser) return;
   try {
-    const res = await fetch(`${API_BASE}/habits?userId=${currentUserId}`, {
+    const res = await fetch(`${API_BASE}/habits?userId=${currentUser.id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, targetDaysPerWeek: parseInt(targetDaysPerWeek, 10) })
@@ -244,7 +588,7 @@ async function createHabit(name, targetDaysPerWeek) {
     newHabitForm.reset();
     habitTargetDays.value = 7;
     targetDaysDisplay.textContent = '7 days / week';
-    await loadHabitsForUser(currentUserId);
+    await loadHabitsForUser(currentUser.id);
   } catch (err) {
     console.error(err);
     showToast(err.message || 'Error creating habit', 'error');
@@ -260,7 +604,7 @@ async function deleteHabit(habitId) {
     const res = await fetch(`${API_BASE}/habits/${habitId}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete habit');
     showToast('Habit deleted', 'info');
-    await loadHabitsForUser(currentUserId);
+    await loadHabitsForUser(currentUser.id);
   } catch (err) {
     console.error(err);
     showToast(err.message || 'Error deleting habit', 'error');
@@ -274,15 +618,9 @@ async function toggleHabitLog(habitId, dateStr, desiredCompleted) {
   try {
     let res;
     if (existingLog) {
-      // Update existing log
-      res = await fetch(`${API_BASE}/habits/${habitId}/logs/${dateStr}?completed=${desiredCompleted}`, {
-        method: 'PUT'
-      });
+      res = await fetch(`${API_BASE}/habits/${habitId}/logs/${dateStr}?completed=${desiredCompleted}`, { method: 'PUT' });
     } else {
-      // Create new log
-      res = await fetch(`${API_BASE}/habits/${habitId}/logs?date=${dateStr}&completed=${desiredCompleted}`, {
-        method: 'POST'
-      });
+      res = await fetch(`${API_BASE}/habits/${habitId}/logs?date=${dateStr}&completed=${desiredCompleted}`, { method: 'POST' });
     }
 
     if (!res.ok) {
@@ -296,72 +634,14 @@ async function toggleHabitLog(habitId, dateStr, desiredCompleted) {
       showToast('Habit marked uncompleted', 'info');
     }
 
-    // Refresh habit data
-    await loadHabitsForUser(currentUserId);
+    await loadHabitsForUser(currentUser.id);
 
-    // If history modal is currently open for this habit, refresh it
     if (activeHistoryHabitId === habitId) {
       renderHistoryModalLogs();
     }
   } catch (err) {
     console.error(err);
     showToast(err.message || 'Error logging habit', 'error');
-  }
-}
-
-// ==========================================
-// Rendering UI Functions
-// ==========================================
-
-function renderUserSelect() {
-  userSelect.innerHTML = '<option value="" disabled>Select User Profile...</option>';
-  
-  if (users.length === 0) {
-    userSelect.innerHTML += '<option value="" disabled>(No users found)</option>';
-  }
-
-  users.forEach(u => {
-    const opt = document.createElement('option');
-    opt.value = u.id;
-    opt.textContent = `${u.name} (${u.email})`;
-    if (currentUserId && String(u.id) === String(currentUserId)) {
-      opt.selected = true;
-    }
-    userSelect.appendChild(opt);
-  });
-
-  // If stored user doesn't exist anymore
-  if (currentUserId && !users.some(u => String(u.id) === String(currentUserId))) {
-    currentUserId = null;
-    localStorage.removeItem('streakify_active_user_id');
-  }
-
-  // Auto-select if only 1 user exists and none selected yet
-  if (!currentUserId && users.length === 1) {
-    switchUser(users[0].id);
-    return;
-  }
-
-  renderAppView();
-}
-
-function switchUser(userId) {
-  currentUserId = userId;
-  localStorage.setItem('streakify_active_user_id', userId);
-  userSelect.value = userId;
-  renderAppView();
-  loadHabitsForUser(userId);
-}
-
-function renderAppView() {
-  if (!currentUserId) {
-    noUserSection.style.display = 'block';
-    dashboardSection.style.display = 'none';
-    btnDeleteUser.style.display = 'none';
-  } else {
-    noUserSection.style.display = 'none';
-    dashboardSection.style.display = 'block';
-    btnDeleteUser.style.display = 'inline-flex';
   }
 }
 
@@ -375,18 +655,12 @@ function renderStats() {
 
   activeHabits.forEach(h => {
     const streak = activeHabitStreakMap[h.id];
-    if (streak && streak.longestStreak > maxStreak) {
-      maxStreak = streak.longestStreak;
-    }
-    if (streak && streak.currentStreak > maxStreak) {
-      maxStreak = streak.currentStreak;
-    }
+    if (streak && streak.longestStreak > maxStreak) maxStreak = streak.longestStreak;
+    if (streak && streak.currentStreak > maxStreak) maxStreak = streak.currentStreak;
 
     const logs = activeHabitLogsMap[h.id] || [];
     const todayLog = logs.find(l => l.logDate === today);
-    if (todayLog && todayLog.completed) {
-      todayDone++;
-    }
+    if (todayLog && todayLog.completed) todayDone++;
   });
 
   statBestStreak.innerHTML = `${maxStreak} <span class="unit">days</span>`;
@@ -416,7 +690,6 @@ function renderHabits() {
     const card = document.createElement('div');
     card.className = 'habit-card';
 
-    // 7 Days chips logic
     const dayChipsHtml = renderWeekChips(habit.id, logs);
 
     card.innerHTML = `
@@ -440,7 +713,6 @@ function renderHabits() {
         </div>
       </div>
 
-      <!-- 7-Day Mini Tracker -->
       <div class="week-tracker">
         ${dayChipsHtml}
       </div>
@@ -461,7 +733,6 @@ function renderHabits() {
     habitsGrid.appendChild(card);
   });
 
-  // Attach card event listeners
   attachHabitCardListeners();
 }
 
@@ -499,7 +770,6 @@ function renderWeekChips(habitId, logs) {
 }
 
 function attachHabitCardListeners() {
-  // Toggle Today button
   document.querySelectorAll('[data-action="toggle-today"]').forEach(btn => {
     btn.addEventListener('click', () => {
       const habitId = parseInt(btn.getAttribute('data-habit-id'), 10);
@@ -511,7 +781,6 @@ function attachHabitCardListeners() {
     });
   });
 
-  // Day chip click toggle
   document.querySelectorAll('.day-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       const habitId = parseInt(chip.getAttribute('data-habit-id'), 10);
@@ -521,7 +790,6 @@ function attachHabitCardListeners() {
     });
   });
 
-  // History button
   document.querySelectorAll('[data-action="history"]').forEach(btn => {
     btn.addEventListener('click', () => {
       const habitId = parseInt(btn.getAttribute('data-habit-id'), 10);
@@ -529,7 +797,6 @@ function attachHabitCardListeners() {
     });
   });
 
-  // Delete button
   document.querySelectorAll('[data-action="delete"]').forEach(btn => {
     btn.addEventListener('click', () => {
       const habitId = parseInt(btn.getAttribute('data-habit-id'), 10);
@@ -563,7 +830,6 @@ function renderHistoryModalLogs() {
     return;
   }
 
-  // Sort descending by date
   const sortedLogs = [...logs].sort((a, b) => b.logDate.localeCompare(a.logDate));
 
   sortedLogs.forEach(l => {
@@ -589,7 +855,6 @@ function renderHistoryModalLogs() {
     logsList.appendChild(item);
   });
 
-  // Attach toggles inside history list
   logsList.querySelectorAll('button[data-history-habit]').forEach(btn => {
     btn.addEventListener('click', () => {
       const hId = parseInt(btn.getAttribute('data-history-habit'), 10);
@@ -600,42 +865,7 @@ function renderHistoryModalLogs() {
   });
 }
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/[&<>"']/g, function(m) {
-    return {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
-    }[m];
-  });
-}
-
-// ==========================================
-// Event Listeners Setup
-// ==========================================
-
-userSelect.addEventListener('change', (e) => {
-  if (e.target.value) {
-    switchUser(e.target.value);
-  }
-});
-
-btnNewUser.addEventListener('click', () => openModal(userModal));
-btnWelcomeCreate.addEventListener('click', () => openModal(userModal));
-btnDeleteUser.addEventListener('click', deleteCurrentUser);
-
-newUserForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const name = document.getElementById('userName').value.trim();
-  const email = document.getElementById('userEmail').value.trim();
-  if (name && email) {
-    createUser(name, email);
-  }
-});
-
+// Modal open buttons
 btnOpenAddHabit.addEventListener('click', () => openModal(habitModal));
 btnEmptyAddHabit.addEventListener('click', () => openModal(habitModal));
 
@@ -643,9 +873,7 @@ newHabitForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const name = document.getElementById('habitName').value.trim();
   const targetDays = habitTargetDays.value;
-  if (name) {
-    createHabit(name, targetDays);
-  }
+  if (name) createHabit(name, targetDays);
 });
 
 customDateLogForm.addEventListener('submit', (e) => {
@@ -653,10 +881,19 @@ customDateLogForm.addEventListener('submit', (e) => {
   if (!activeHistoryHabitId) return;
   const dateStr = customLogDate.value;
   const completed = customLogStatus.value === 'true';
-  if (dateStr) {
-    toggleHabitLog(activeHistoryHabitId, dateStr, completed);
-  }
+  if (dateStr) toggleHabitLog(activeHistoryHabitId, dateStr, completed);
 });
 
-// Initial startup
-fetchUsers();
+// ==========================================
+// Initialization on page load
+// ==========================================
+const savedUser = localStorage.getItem('streakify_auth_user');
+if (savedUser) {
+  try {
+    currentUser = JSON.parse(savedUser);
+  } catch (e) {
+    currentUser = null;
+  }
+}
+
+updateUIForUser();

@@ -23,6 +23,14 @@ public class User {
 
     private String email;
 
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
+    private String password;
+
+    private String role; // "ROLE_USER" or "ROLE_ADMIN"
+
+    @Builder.Default
+    private Boolean active = true;
+
     private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)

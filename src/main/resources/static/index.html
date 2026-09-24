@@ -21,37 +21,75 @@
         </div>
       </div>
 
-      <div class="user-controls">
-        <div class="user-selector-container">
-          <label for="userSelect" class="sr-only">Switch User</label>
-          <select id="userSelect" class="form-select">
-            <option value="" disabled selected>Select User Profile...</option>
-          </select>
+      <!-- Navigation & Auth Controls -->
+      <div class="user-controls" id="headerControls">
+        <!-- Logged In Navigation (User or Admin) -->
+        <div id="navLoggedIn" class="nav-links" style="display: none;">
+          <button id="navBtnHabits" class="nav-btn active">📊 My Habits</button>
+          <button id="navBtnAdmin" class="nav-btn" style="display: none;">🛡️ Admin Panel</button>
+          <button id="navBtnLeaderboard" class="nav-btn">🏆 Leaderboard</button>
+          
+          <div class="header-user-info">
+            <span id="userBadge" class="user-badge">👤 <span id="userNameDisplay">User</span></span>
+            <button id="btnSignOut" class="btn btn-secondary btn-sm" title="Sign Out">Sign Out</button>
+          </div>
         </div>
-        <button id="btnNewUser" class="btn btn-secondary">
-          <span class="icon">+</span> New User
-        </button>
-        <button id="btnDeleteUser" class="btn btn-danger-outline" title="Delete current user" style="display: none;">
-          🗑️
-        </button>
+
+        <!-- Logged Out Button -->
+        <div id="navLoggedOut">
+          <button id="btnOpenAuth" class="btn btn-primary">🔑 Sign In / Register</button>
+        </div>
       </div>
     </header>
 
     <!-- Main Content Area -->
     <main class="main-content">
-      <!-- Welcome / No User Banner -->
-      <section id="noUserSection" class="card welcome-card" style="display: none;">
-        <div class="welcome-content">
-          <div class="welcome-icon">🚀</div>
-          <h2>Welcome to Streakify!</h2>
-          <p>Get started by creating your user profile or selecting an existing one from the top right.</p>
-          <button id="btnWelcomeCreate" class="btn btn-primary btn-lg">
-            Create Profile Now
-          </button>
+      <!-- 1. Authentication View (Shown when not logged in) -->
+      <section id="authSection" class="auth-container">
+        <div class="auth-card">
+          <!-- Auth Tabs -->
+          <div class="auth-tabs">
+            <button type="button" class="auth-tab active" id="tabUserLogin">👤 User Login</button>
+            <button type="button" class="auth-tab" id="tabAdminLogin">🛡️ Admin Portal</button>
+            <button type="button" class="auth-tab" id="tabRegister">✨ Register</button>
+          </div>
+
+          <div class="auth-header">
+            <h2 id="authTitle">Welcome Back</h2>
+            <p id="authSubtitle">Sign in to track your habits and maintain your streak.</p>
+          </div>
+
+          <form id="authForm">
+            <!-- Name field for registration only -->
+            <div class="form-group" id="groupAuthName" style="display: none;">
+              <label for="authName">Full Name</label>
+              <input type="text" id="authName" class="form-control" placeholder="e.g. Amal Alex" />
+            </div>
+
+            <div class="form-group">
+              <label for="authEmail">Email Address</label>
+              <input type="email" id="authEmail" class="form-control" placeholder="your.email@example.com" required />
+            </div>
+
+            <div class="form-group">
+              <label for="authPassword">Password</label>
+              <input type="password" id="authPassword" class="form-control" placeholder="Enter password" required />
+            </div>
+
+            <!-- Admin Hint -->
+            <div id="adminHintBox" class="admin-hint" style="display: none;">
+              🔑 <strong>Default Admin Credentials:</strong><br>
+              Email: <code>admin@streakify.com</code> | Password: <code>admin123</code>
+            </div>
+
+            <button type="submit" id="btnAuthSubmit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 14px;">
+              Sign In
+            </button>
+          </form>
         </div>
       </section>
 
-      <!-- Dashboard View (Shown when user is selected) -->
+      <!-- 2. User Dashboard (Personal habits) -->
       <div id="dashboardSection" style="display: none;">
         <!-- Top Stats Row -->
         <section class="stats-grid">
@@ -113,36 +151,113 @@
           </div>
         </section>
       </div>
+
+      <!-- 3. Admin Command Center View -->
+      <div id="adminSection" style="display: none;">
+        <!-- Admin Overview Stats -->
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-title">Registered Users</span>
+              <span class="stat-icon">👥</span>
+            </div>
+            <div class="stat-value" id="adminTotalUsers">0</div>
+            <div class="stat-sub">Platform total</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-title">Total Habits</span>
+              <span class="stat-icon">📘</span>
+            </div>
+            <div class="stat-value" id="adminTotalHabits">0</div>
+            <div class="stat-sub">Created across all users</div>
+          </div>
+
+          <div class="stat-card highlight-card">
+            <div class="stat-header">
+              <span class="stat-title">Active Streaks</span>
+              <span class="stat-icon">🔥</span>
+            </div>
+            <div class="stat-value" id="adminActiveStreaks">0</div>
+            <div class="stat-sub">Currently running</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-title">Record Streak</span>
+              <span class="stat-icon">👑</span>
+            </div>
+            <div class="stat-value" id="adminRecordStreak">0 <span class="unit">days</span></div>
+            <div class="stat-sub">Platform all-time high</div>
+          </div>
+        </section>
+
+        <!-- User Management Table -->
+        <section class="habits-section">
+          <div class="section-header-row">
+            <div class="section-title-wrap">
+              <h2>User Management & Streak Directory</h2>
+              <p>Monitor user accounts, activity status, and overall streak records.</p>
+            </div>
+            <button id="btnRefreshAdmin" class="btn btn-secondary btn-sm">🔄 Refresh Data</button>
+          </div>
+
+          <div class="table-card">
+            <table class="app-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Habits</th>
+                  <th>Current Streak</th>
+                  <th>Best Streak</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="adminUserTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <!-- 4. Community Leaderboard View -->
+      <div id="leaderboardSection" style="display: none;">
+        <div class="section-header-row">
+          <div class="section-title-wrap">
+            <h2>🏆 Community Leaderboard</h2>
+            <p>Top active streaks maintained by dedicated builders.</p>
+          </div>
+          <button id="btnRefreshLeaderboard" class="btn btn-secondary btn-sm">🔄 Refresh</button>
+        </div>
+
+        <div class="table-card">
+          <table class="app-table">
+            <thead>
+              <tr>
+                <th style="width: 80px;">Rank</th>
+                <th>Builder</th>
+                <th>Habit Name</th>
+                <th>Current Streak</th>
+                <th>Longest Streak</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
     </main>
 
     <!-- Footer -->
     <footer class="app-footer">
-      <p>Streakify Backend & Frontend • Powered by Spring Boot & REST APIs</p>
+      <p>Streakify • Powered by Spring Boot, PostgreSQL & REST APIs</p>
     </footer>
-  </div>
-
-  <!-- Modal: Create New User -->
-  <div id="userModal" class="modal-backdrop" style="display: none;">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 class="modal-title">Create User Profile</h3>
-        <button class="modal-close" data-close="userModal">&times;</button>
-      </div>
-      <form id="newUserForm">
-        <div class="form-group">
-          <label for="userName">Full Name</label>
-          <input type="text" id="userName" class="form-control" placeholder="e.g. Alex Hunter" required />
-        </div>
-        <div class="form-group">
-          <label for="userEmail">Email Address</label>
-          <input type="email" id="userEmail" class="form-control" placeholder="alex@example.com" required />
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-close="userModal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Create User</button>
-        </div>
-      </form>
-    </div>
   </div>
 
   <!-- Modal: Add Habit -->
@@ -211,6 +326,25 @@
 
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-close="historyModal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Admin View User Habits -->
+  <div id="adminHabitsModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="adminHabitsModalTitle">User Habits</h3>
+          <p class="modal-subtitle" id="adminHabitsModalSubtitle">Habits and streak performance</p>
+        </div>
+        <button class="modal-close" data-close="adminHabitsModal">&times;</button>
+      </div>
+      <div id="adminHabitsList" style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
+        <!-- Dynamically populated -->
+      </div>
+      <div class="modal-footer" style="margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" data-close="adminHabitsModal">Close</button>
       </div>
     </div>
   </div>
