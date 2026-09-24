@@ -31,7 +31,8 @@ public class HabitLogServiceImpl implements HabitLogService {
         Habit habit = habitRepository.findById(habitId)
                 .orElseThrow(() -> new HabitNotFoundException("Habit not found"));
 
-        if (date.isAfter(LocalDate.now())) {
+        LocalDate maxAllowedDate = LocalDate.now().plusDays(1);
+        if (date.isAfter(maxAllowedDate)) {
             throw new RuntimeException("Cannot log future date");
         }
 
@@ -57,7 +58,8 @@ public class HabitLogServiceImpl implements HabitLogService {
         Habit habit = habitRepository.findById(habitId)
                 .orElseThrow(() -> new HabitNotFoundException("Habit not found"));
 
-        if (date.isAfter(LocalDate.now())) {
+        LocalDate maxAllowedDate = LocalDate.now().plusDays(1);
+        if (date.isAfter(maxAllowedDate)) {
             throw new RuntimeException("Cannot log future date");
         }
 
@@ -94,41 +96,50 @@ public class HabitLogServiceImpl implements HabitLogService {
 
         int currentStreak = 0;
         int longestStreak = 0;
+
+        // Collect all completed distinct dates
+        Set<LocalDate> completedDates = new HashSet<>();
+        for (HabitLog l : logs) {
+            if (l.isCompleted()) {
+                completedDates.add(l.getLogDate());
+            }
+        }
+
+        // 1. LONGEST STREAK
+        List<LocalDate> sortedDates = completedDates.stream().sorted().toList();
         int tempStreak = 0;
-
-        LocalDate previousDate = null;
-
-        // LONGEST STREAK
-        for (HabitLog log : logs) {
-
-            if (!log.isCompleted()) continue;
-
-            if (previousDate == null) {
-                tempStreak = 1;
-            } else if (log.getLogDate().equals(previousDate.plusDays(1))) {
-                tempStreak++;
+        LocalDate prev = null;
+        for (LocalDate d : sortedDates) {
+            if (prev == null || d.equals(prev.plusDays(1))) {
+                tempStreak = (prev == null) ? 1 : tempStreak + 1;
             } else {
                 tempStreak = 1;
             }
-
-            previousDate = log.getLogDate();
+            prev = d;
             longestStreak = Math.max(longestStreak, tempStreak);
         }
 
-        // CURRENT STREAK
-        Collections.reverse(logs);
+        // 2. CURRENT STREAK
+        // Find latest completed date
+        LocalDate latestCompleted = sortedDates.isEmpty() ? null : sortedDates.get(sortedDates.size() - 1);
+        if (latestCompleted != null) {
+            LocalDate serverToday = LocalDate.now();
+            long daysFromToday = java.time.temporal.ChronoUnit.DAYS.between(latestCompleted, serverToday);
 
-        LocalDate today = LocalDate.now();
-
-        for (HabitLog log : logs) {
-            if (!log.isCompleted()) break;
-
-            if (log.getLogDate().equals(today.minusDays(currentStreak))) {
-                currentStreak++;
-            } else {
-                break;
+            // Active streak if latest is:
+            // -1: client today in forward timezone (e.g. IST +5:30)
+            //  0: server today
+            //  1: yesterday (today is still in progress, streak is maintained!)
+            if (daysFromToday >= -1 && daysFromToday <= 1) {
+                LocalDate checkDate = latestCompleted;
+                while (completedDates.contains(checkDate)) {
+                    currentStreak++;
+                    checkDate = checkDate.minusDays(1);
+                }
             }
         }
+
+        longestStreak = Math.max(longestStreak, currentStreak);
 
         Map<String, Object> result = new HashMap<>();
         result.put("habitId", habitId);
