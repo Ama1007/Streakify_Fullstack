@@ -9,6 +9,7 @@ A **Spring Boot** REST API backend for tracking user habits, logging daily compl
 - [Tech Stack](#-tech-stack)
 - [Architecture](#-architecture)
 - [Features](#-features)
+- [Frontend (HTML/CSS/JS)](#-frontend-html-css-js)
 - [Setup Instructions](#-setup-instructions)
 - [API Reference](#-api-reference)
 - [Business Logic](#-business-logic)
@@ -79,6 +80,22 @@ com.streakify.streakify
 - Custom exceptions
 - Global exception handler
 - Proper HTTP status codes (`400`, `404`)
+
+---
+
+## 🎨 Frontend (HTML / CSS / JS)
+
+A clean, modern, and responsive user interface built using **Vanilla HTML5, CSS3, and JavaScript** (no heavy frameworks or node_modules needed):
+
+- **User Profile Switcher**: Switch between profiles or create new users on the fly.
+- **Habit Dashboard**: Overview metrics showing Active Habits, Personal Best Streak, and Today's completion rate with an animated progress bar.
+- **Interactive Habit Cards**:
+  - One-click **"Check In Today"** toggle.
+  - **7-Day Mini Calendar Matrix**: Visual representation of the last 7 days; click any day to toggle completion status.
+  - 🔥 **Current Streak** & 🏆 **Longest Streak** counters.
+- **Log History & Past Dates Modal**: View all past logs and retroactively log or update dates (preventing future dates per backend rules).
+- **Toast Notifications**: Real-time feedback for logs, habit additions, and deletions.
+- **Dual Launch Option**: Served directly via Spring Boot at `http://localhost:8080/` (`src/main/resources/static/`) or opened via VS Code Live Server from `frontend/index.html`.
 
 ---
 

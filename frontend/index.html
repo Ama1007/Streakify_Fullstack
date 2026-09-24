@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Streakify - Habit & Streak Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Navigation / Top Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">🔥</div>
+        <div>
+          <h1 class="brand-name">Streakify</h1>
+          <p class="brand-tagline">Build habits. Maintain streaks.</p>
+        </div>
+      </div>
+
+      <div class="user-controls">
+        <div class="user-selector-container">
+          <label for="userSelect" class="sr-only">Switch User</label>
+          <select id="userSelect" class="form-select">
+            <option value="" disabled selected>Select User Profile...</option>
+          </select>
+        </div>
+        <button id="btnNewUser" class="btn btn-secondary">
+          <span class="icon">+</span> New User
+        </button>
+        <button id="btnDeleteUser" class="btn btn-danger-outline" title="Delete current user" style="display: none;">
+          🗑️
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Welcome / No User Banner -->
+      <section id="noUserSection" class="card welcome-card" style="display: none;">
+        <div class="welcome-content">
+          <div class="welcome-icon">🚀</div>
+          <h2>Welcome to Streakify!</h2>
+          <p>Get started by creating your user profile or selecting an existing one from the top right.</p>
+          <button id="btnWelcomeCreate" class="btn btn-primary btn-lg">
+            Create Profile Now
+          </button>
+        </div>
+      </section>
+
+      <!-- Dashboard View (Shown when user is selected) -->
+      <div id="dashboardSection" style="display: none;">
+        <!-- Top Stats Row -->
+        <section class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-title">Active Habits</span>
+              <span class="stat-icon">🎯</span>
+            </div>
+            <div class="stat-value" id="statTotalHabits">0</div>
+            <div class="stat-sub">Tracked regularly</div>
+          </div>
+
+          <div class="stat-card highlight-card">
+            <div class="stat-header">
+              <span class="stat-title">Top Streak</span>
+              <span class="stat-icon">🏆</span>
+            </div>
+            <div class="stat-value" id="statBestStreak">0 <span class="unit">days</span></div>
+            <div class="stat-sub">Personal best</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-title">Today's Progress</span>
+              <span class="stat-icon">⚡</span>
+            </div>
+            <div class="stat-value" id="statTodayCompleted">0 / 0</div>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" id="todayProgressBar" style="width: 0%"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Habits List Section -->
+        <section class="habits-section">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Your Habits</h2>
+              <p class="section-subtitle">Check in daily to build unbreakable momentum.</p>
+            </div>
+            <button id="btnOpenAddHabit" class="btn btn-primary">
+              <span class="icon">+</span> Add New Habit
+            </button>
+          </div>
+
+          <!-- Empty habits state -->
+          <div id="emptyHabitsState" class="card empty-state" style="display: none;">
+            <div class="empty-icon">🌱</div>
+            <h3>No habits created yet</h3>
+            <p>Every journey begins with a single step. Create your first habit now!</p>
+            <button id="btnEmptyAddHabit" class="btn btn-primary">
+              + Create First Habit
+            </button>
+          </div>
+
+          <!-- Habit Cards Grid -->
+          <div id="habitsGrid" class="habits-grid">
+            <!-- Dynamic habit cards will be injected here -->
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Streakify Backend & Frontend • Powered by Spring Boot & REST APIs</p>
+    </footer>
+  </div>
+
+  <!-- Modal: Create New User -->
+  <div id="userModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Create User Profile</h3>
+        <button class="modal-close" data-close="userModal">&times;</button>
+      </div>
+      <form id="newUserForm">
+        <div class="form-group">
+          <label for="userName">Full Name</label>
+          <input type="text" id="userName" class="form-control" placeholder="e.g. Alex Hunter" required />
+        </div>
+        <div class="form-group">
+          <label for="userEmail">Email Address</label>
+          <input type="email" id="userEmail" class="form-control" placeholder="alex@example.com" required />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="userModal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add Habit -->
+  <div id="habitModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Add New Habit</h3>
+        <button class="modal-close" data-close="habitModal">&times;</button>
+      </div>
+      <form id="newHabitForm">
+        <div class="form-group">
+          <label for="habitName">Habit Name</label>
+          <input type="text" id="habitName" class="form-control" placeholder="e.g., Morning Workout, Read 20 mins" required />
+        </div>
+        <div class="form-group">
+          <div class="label-with-value">
+            <label for="habitTargetDays">Weekly Target</label>
+            <span class="range-display" id="targetDaysDisplay">7 days / week</span>
+          </div>
+          <input type="range" id="habitTargetDays" class="form-range" min="1" max="7" value="7" />
+          <div class="range-presets">
+            <button type="button" class="preset-chip" data-days="7">Every day (7)</button>
+            <button type="button" class="preset-chip" data-days="5">Weekdays (5)</button>
+            <button type="button" class="preset-chip" data-days="3">3 Days</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="habitModal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Habit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Habit History & Log Past Date -->
+  <div id="historyModal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="historyModalTitle">Habit History</h3>
+          <p class="modal-subtitle" id="historyModalSubtitle">View all logs and log past dates</p>
+        </div>
+        <button class="modal-close" data-close="historyModal">&times;</button>
+      </div>
+      
+      <!-- Custom Date Log Bar -->
+      <div class="custom-log-bar">
+        <h4>Log Specific Date</h4>
+        <form id="customDateLogForm" class="custom-log-form">
+          <input type="date" id="customLogDate" class="form-control form-control-sm" required />
+          <select id="customLogStatus" class="form-select form-select-sm">
+            <option value="true">✅ Completed</option>
+            <option value="false">❌ Not Completed</option>
+          </select>
+          <button type="submit" class="btn btn-primary btn-sm">Log / Update</button>
+        </form>
+      </div>
+
+      <!-- Historical Logs Table / List -->
+      <div class="logs-container">
+        <h4>Recorded Logs</h4>
+        <div id="logsList" class="logs-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="historyModal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

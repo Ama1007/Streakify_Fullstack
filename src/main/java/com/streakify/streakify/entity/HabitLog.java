@@ -21,6 +21,7 @@ public class HabitLog {
 
     @ManyToOne
     @JoinColumn(name = "habit_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"logs", "user"})
     private Habit habit;
 
     @Column(name = "log_date", nullable = false)
