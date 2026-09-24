@@ -5,11 +5,13 @@ import com.streakify.streakify.entity.User;
 import com.streakify.streakify.repository.HabitRepository;
 import com.streakify.streakify.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@Transactional
 public class HabitServiceImpl implements HabitService {
 
     private final HabitRepository habitRepository;

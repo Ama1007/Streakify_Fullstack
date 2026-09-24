@@ -7,11 +7,13 @@ import com.streakify.streakify.exception.HabitNotFoundException;
 import com.streakify.streakify.repository.HabitLogRepository;
 import com.streakify.streakify.repository.HabitRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.*;
 
 @Service
+@Transactional
 public class HabitLogServiceImpl implements HabitLogService {
 
     private final HabitRepository habitRepository;
