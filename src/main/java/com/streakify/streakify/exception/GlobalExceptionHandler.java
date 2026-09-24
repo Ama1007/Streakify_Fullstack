@@ -50,7 +50,8 @@ public class GlobalExceptionHandler {
         Map<String, Object> error = new HashMap<>();
         error.put("timestamp", LocalDateTime.now());
         error.put("status", 500);
-        error.put("error", "Database operation failed. Please try again.");
+        String cause = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        error.put("error", cause != null ? cause : "Database operation failed");
 
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
     }
