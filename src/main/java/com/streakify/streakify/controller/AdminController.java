@@ -37,8 +37,8 @@ public class AdminController {
 
         for (Habit habit : allHabits) {
             Map<String, Object> streak = habitLogService.calculateStreak(habit.getId());
-            int currentStreak = (int) streak.getOrDefault("currentStreak", 0);
-            int longestStreak = (int) streak.getOrDefault("longestStreak", 0);
+            int currentStreak = streak.get("currentStreak") instanceof Number n ? n.intValue() : 0;
+            int longestStreak = streak.get("longestStreak") instanceof Number n ? n.intValue() : 0;
             if (currentStreak > 0) activeStreaksCount++;
             if (longestStreak > highestStreak) highestStreak = longestStreak;
         }
@@ -75,8 +75,8 @@ public class AdminController {
 
             for (Habit h : habits) {
                 Map<String, Object> streakInfo = habitLogService.calculateStreak(h.getId());
-                int currentStreak = (int) streakInfo.getOrDefault("currentStreak", 0);
-                int longestStreak = (int) streakInfo.getOrDefault("longestStreak", 0);
+                int currentStreak = streakInfo.get("currentStreak") instanceof Number n ? n.intValue() : 0;
+                int longestStreak = streakInfo.get("longestStreak") instanceof Number n ? n.intValue() : 0;
 
                 if (currentStreak > userMaxCurrentStreak) userMaxCurrentStreak = currentStreak;
                 if (longestStreak > userMaxLongestStreak) userMaxLongestStreak = longestStreak;

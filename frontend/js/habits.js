@@ -27,6 +27,9 @@ const customLogDate = document.getElementById('customLogDate');
 const customLogStatus = document.getElementById('customLogStatus');
 const logsList = document.getElementById('logsList');
 
+// In-flight request debounce tracker
+const pendingLogKeys = new Set();
+
 async function loadHabitsForUser(userId) {
   if (!userId) return;
   try {
@@ -34,12 +37,13 @@ async function loadHabitsForUser(userId) {
     if (!res.ok) throw new Error('Failed to fetch habits');
     activeHabits = await res.json();
 
-    // Fetch streaks & logs in parallel
+    // Fetch streaks & logs in parallel with fresh cache
+    const timestamp = Date.now();
     await Promise.all(activeHabits.map(async (h) => {
       try {
         const [streakRes, logsRes] = await Promise.all([
-          fetch(`${API_BASE}/habits/${h.id}/streak`),
-          fetch(`${API_BASE}/habits/${h.id}/logs`)
+          fetch(`${API_BASE}/habits/${h.id}/streak?_t=${timestamp}`, { cache: 'no-store' }),
+          fetch(`${API_BASE}/habits/${h.id}/logs?_t=${timestamp}`, { cache: 'no-store' })
         ]);
         if (streakRes.ok) activeHabitStreakMap[h.id] = await streakRes.json();
         if (logsRes.ok) activeHabitLogsMap[h.id] = await logsRes.json();
@@ -95,15 +99,25 @@ async function deleteHabit(habitId) {
 }
 
 async function toggleHabitLog(habitId, dateStr, desiredCompleted) {
+  const reqKey = `${habitId}_${dateStr}`;
+  if (pendingLogKeys.has(reqKey)) return; // Prevent double clicks
+  pendingLogKeys.add(reqKey);
+
   const existingLogs = activeHabitLogsMap[habitId] || [];
   const existingLog = existingLogs.find(l => l.logDate === dateStr);
 
   try {
     let res;
     if (existingLog) {
-      res = await fetch(`${API_BASE}/habits/${habitId}/logs/${dateStr}?completed=${desiredCompleted}`, { method: 'PUT' });
+      res = await fetch(`${API_BASE}/habits/${habitId}/logs/${dateStr}?completed=${desiredCompleted}`, {
+        method: 'PUT',
+        cache: 'no-store'
+      });
     } else {
-      res = await fetch(`${API_BASE}/habits/${habitId}/logs?date=${dateStr}&completed=${desiredCompleted}`, { method: 'POST' });
+      res = await fetch(`${API_BASE}/habits/${habitId}/logs?date=${dateStr}&completed=${desiredCompleted}`, {
+        method: 'POST',
+        cache: 'no-store'
+      });
     }
 
     if (!res.ok) {
@@ -125,6 +139,8 @@ async function toggleHabitLog(habitId, dateStr, desiredCompleted) {
   } catch (err) {
     console.error(err);
     showToast(err.message || 'Error logging habit', 'error');
+  } finally {
+    pendingLogKeys.delete(reqKey);
   }
 }
 
@@ -364,11 +380,25 @@ if (newHabitForm) {
 }
 
 if (customDateLogForm) {
-  customDateLogForm.addEventListener('submit', (e) => {
+  customDateLogForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!activeHistoryHabitId) return;
     const dateStr = customLogDate.value;
     const completed = customLogStatus.value === 'true';
-    if (dateStr) toggleHabitLog(activeHistoryHabitId, dateStr, completed);
+    const submitBtn = customDateLogForm.querySelector('button[type="submit"]');
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
+    }
+
+    try {
+      if (dateStr) await toggleHabitLog(activeHistoryHabitId, dateStr, completed);
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Log / Update';
+      }
+    }
   });
 }

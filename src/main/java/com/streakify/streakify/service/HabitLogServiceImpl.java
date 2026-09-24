@@ -33,8 +33,11 @@ public class HabitLogServiceImpl implements HabitLogService {
             throw new RuntimeException("Cannot log future date");
         }
 
-        if (habitLogRepository.findByHabitAndLogDate(habit, date).isPresent()) {
-            throw new DuplicateLogException("Log already exists for this date");
+        Optional<HabitLog> existing = habitLogRepository.findByHabitAndLogDate(habit, date);
+        if (existing.isPresent()) {
+            HabitLog log = existing.get();
+            log.setCompleted(completed);
+            return habitLogRepository.save(log);
         }
 
         HabitLog log = HabitLog.builder()
@@ -52,11 +55,22 @@ public class HabitLogServiceImpl implements HabitLogService {
         Habit habit = habitRepository.findById(habitId)
                 .orElseThrow(() -> new HabitNotFoundException("Habit not found"));
 
-        HabitLog log = habitLogRepository
-                .findByHabitAndLogDate(habit, date)
-                .orElseThrow(() -> new RuntimeException("Log not found"));
+        if (date.isAfter(LocalDate.now())) {
+            throw new RuntimeException("Cannot log future date");
+        }
 
-        log.setCompleted(completed);
+        Optional<HabitLog> existing = habitLogRepository.findByHabitAndLogDate(habit, date);
+        if (existing.isPresent()) {
+            HabitLog log = existing.get();
+            log.setCompleted(completed);
+            return habitLogRepository.save(log);
+        }
+
+        HabitLog log = HabitLog.builder()
+                .habit(habit)
+                .logDate(date)
+                .completed(completed)
+                .build();
 
         return habitLogRepository.save(log);
     }

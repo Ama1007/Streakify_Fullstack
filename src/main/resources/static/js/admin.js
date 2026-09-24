@@ -16,36 +16,75 @@ const adminHabitsModalTitle = document.getElementById('adminHabitsModalTitle');
 const adminHabitsList = document.getElementById('adminHabitsList');
 
 async function loadAdminData() {
+  if (btnRefreshAdmin) {
+    btnRefreshAdmin.disabled = true;
+    btnRefreshAdmin.textContent = '⏳ Refreshing...';
+  }
+
   try {
+    const timestamp = Date.now();
     const [statsRes, usersRes] = await Promise.all([
-      fetch(`${API_BASE}/admin/stats`),
-      fetch(`${API_BASE}/admin/users`)
+      fetch(`${API_BASE}/admin/stats?_t=${timestamp}`, { cache: 'no-store' }).catch(() => null),
+      fetch(`${API_BASE}/admin/users?_t=${timestamp}`, { cache: 'no-store' }).catch(() => null)
     ]);
 
-    if (statsRes.ok) {
+    let statsLoaded = false;
+    if (statsRes && statsRes.ok) {
       const stats = await statsRes.json();
-      if (adminTotalUsers) adminTotalUsers.textContent = stats.totalUsers || 0;
-      if (adminTotalHabits) adminTotalHabits.textContent = stats.totalHabits || 0;
-      if (adminActiveStreaks) adminActiveStreaks.textContent = stats.activeStreaks || 0;
-      if (adminRecordStreak) adminRecordStreak.innerHTML = `${stats.highestStreak || 0} <span class="unit">days</span>`;
+      if (adminTotalUsers) adminTotalUsers.textContent = stats.totalUsers ?? 0;
+      if (adminTotalHabits) adminTotalHabits.textContent = stats.totalHabits ?? 0;
+      if (adminActiveStreaks) adminActiveStreaks.textContent = stats.activeStreaks ?? 0;
+      if (adminRecordStreak) adminRecordStreak.innerHTML = `${stats.highestStreak ?? 0} <span class="unit">days</span>`;
+      statsLoaded = true;
     }
 
-    if (usersRes.ok) {
+    if (usersRes && usersRes.ok) {
       const usersList = await usersRes.json();
       renderAdminUsersTable(usersList);
+
+      // Robust client-side fallback: ensure stat cards always reflect loaded data
+      if (!statsLoaded && usersList) {
+        const totalUsers = usersList.length;
+        let totalHabits = 0;
+        let activeStreaks = 0;
+        let highestStreak = 0;
+
+        usersList.forEach(u => {
+          totalHabits += (u.habitCount || (u.habits ? u.habits.length : 0));
+          if (u.currentStreak > 0) activeStreaks++;
+          if (u.longestStreak > highestStreak) highestStreak = u.longestStreak;
+        });
+
+        if (adminTotalUsers) adminTotalUsers.textContent = totalUsers;
+        if (adminTotalHabits) adminTotalHabits.textContent = totalHabits;
+        if (adminActiveStreaks) adminActiveStreaks.textContent = activeStreaks;
+        if (adminRecordStreak) adminRecordStreak.innerHTML = `${highestStreak} <span class="unit">days</span>`;
+      }
     }
   } catch (err) {
     console.error('Failed to load admin data:', err);
     showToast('Failed to load admin dashboard data', 'error');
+  } finally {
+    if (btnRefreshAdmin) {
+      btnRefreshAdmin.disabled = false;
+      btnRefreshAdmin.textContent = '🔄 Refresh Data';
+    }
   }
 }
 
 if (btnRefreshAdmin) {
-  btnRefreshAdmin.addEventListener('click', () => {
-    loadAdminData();
-    showToast('Admin data refreshed', 'info');
+  btnRefreshAdmin.addEventListener('click', async () => {
+    await loadAdminData();
+    showToast('Admin data refreshed', 'success');
   });
 }
+
+// Auto-refresh when returning to admin tab
+window.addEventListener('focus', () => {
+  if (currentView === 'admin' && currentUser && currentUser.role === 'ROLE_ADMIN') {
+    loadAdminData();
+  }
+});
 
 function renderAdminUsersTable(usersList) {
   if (!adminUserTableBody) return;
